@@ -48,6 +48,55 @@ def generateRows(df,yr):
     #print(df)
     return df
 
+def swap_df(df):
+    
+    cols_swap={'Total Premium Income':'Premium Income',
+        'Total Reinsurance Premium':'Reinsurance Income',
+        'Total Decrease (Increase) In Premium Reserve and Unearned Premium Reserve':'Decrease (increase) in Premium Reserve And Unearned Premium Reserve',
+        'Nett Other Underwriting Income':'Other Revenue',
+        'Underwriting Income':'Total Revenue',
+        'Gross Claims':'Claim and Benefit Paid',
+        'Reinsurance Recoveries':'Reinsurance Recovery',
+        'Total Claim Expenses':'Total Claims and Benefits',
+        'Total Underwriting Expenses':'Total Insurance Expenses',
+        'Management Cost':'Management Expenses',
+        'Total Operating Expense':'Total Operating Expenses',
+        'Income After Tax':'Income (Loss) After Tax',
+        'Other Comprehensive Income':'Other Comprehensif Income'}
+    
+    df.rename(columns = cols_swap,inplace = True)
+    return df
+    
+    return ''
+def specified_cols_df(df):
+    cols=[
+    'Periode',
+    'Premium Income',
+    'Reinsurance Income',
+    'Decrease (increase) in Premium Reserve And Unearned Premium Reserve',
+    'Total Net Premium Income',
+    'Investment Yield',
+    'Other Revenue',
+    'Total Revenue',
+    'Claim and Benefit Paid',
+    'Reinsurance Recovery',
+    'Total Claims and Benefits',
+    'Total Insurance Expenses',
+    'Marketing Expenses',
+    'Employee and Management Expenses',
+    'General And Administration Expenses',
+    'Other General And Administration Expenses',
+    'Management Expenses',
+    'Total Operating Expenses',
+    'Income (Loss) Before Tax',
+    'Taxes',
+    'Income (Loss) After Tax',
+    'Other Comprehensif Income',
+    'Total Comprehensive Income (Loss)'
+    ]
+    df=df[cols]
+    return df
+
 def getAccountByYear(dbname,tablename,start_period,end_period):
     # Read sqlite query results into a pandas DataFrame
     con = sqlite3.connect(dbname)

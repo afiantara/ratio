@@ -40,7 +40,7 @@ def write_sql(df,tablename):
 
 if __name__=="__main__":
     
-    from fs import getAccountByYear,difference
+    from fs import getAccountByYear,specified_cols_df,swap_df
     #life insurance merge financial statement and income statement
     
     #financial statement
@@ -49,6 +49,9 @@ if __name__=="__main__":
     #income statement
     con,d_isLife = getAccountByYear(db_is_names[0],tbl_is_names[0],2018,2023)
     con.close()
+    #call specific column from income statement.
+    d_isLife=specified_cols_df(d_isLife)
+    
     #merge here for life_insurance
     d_Life=pd.merge(d_fsLife, d_isLife, on="Periode") 
     d_Life['sector']='life_insurance'
@@ -61,32 +64,19 @@ if __name__=="__main__":
     #income statement
     con,dis_NonLife = getAccountByYear(db_is_names[1],tbl_is_names[1],2018,2023)
     con.close()
+    
+    dis_NonLife=swap_df(dis_NonLife)
+    dis_NonLife=specified_cols_df(dis_NonLife)
     #merge here
     d_NonLife=pd.merge(dfs_NonLife, dis_NonLife, on="Periode") 
     d_NonLife['sector']='non_life_insurance'
-    
-    #join_financial_statement(d_fsLife,dfs_NonLife)
-    d_NonLife.rename(columns = {'Income After Tax':'Income (Loss) After Tax', 'Other Comprehensif Income':'Other Comprehensive Income', 
-                              'Total Premium Income':'Premium Income','Total Reinsurance Premium':'Reinsurance Income',
-                              'Total Claim Expenses':'Total Claims and Benefits',
-                              'Total Operating Expense':'Total Operating Expenses',
-                              'Decrease (Increase) In Premium Reserve':'Increase (decrease) in Premium Reserve',
-                              'Decrease (Increase) In Catastrophic Reserve':'Increase (decrease) in Catastrophic Reserve',
-                              'Increase (Decrease) in Claim Reserve':'Increase (decrease) in Claim Reserve'}, inplace = True) 
-    
-    #diperlukan ketika mau dijoin secara vertical
-    # d_Life = d_Life.reset_index()
-    #d_NonLife = d_NonLife.reset_index()
-    #df_join = pd.concat([d_Life, d_NonLife],axis=1)    
-    #write_sql(df_join,'life_non_life')
+
     #calculate difference of all columns
-    
     #create group by year
     d_Life['year'] = d_Life['Periode'].dt.year
     d_NonLife['year']=d_NonLife['Periode'].dt.year
-    
     #calculate difference with prefix D_    
-    accts=['Income (Loss) Before Tax','Premium Income','Total Claims and Benefits','Total Operating Expenses','Total Net Premium Income','Reinsurance Income','Income (Loss) After Tax','General And Administration Expenses']
+    accts=['Total Assets','Total Investment','Investment Yield','Income (Loss) Before Tax','Premium Income','Total Claims and Benefits','Total Operating Expenses','Total Net Premium Income','Reinsurance Income','Income (Loss) After Tax','General And Administration Expenses']
     
     for count in accts:
         #delta
@@ -95,17 +85,39 @@ if __name__=="__main__":
         #moving average 12 bulan
         ma_12=d_Life[count].rolling(window=12)
         d_Life['Roll_' + count] =ma_12.mean()
+        #percent change
+        d_Life['Growth_'+count]=d_Life[count].pct_change(periods=12)*100
         
         #delta
         d_NonLife['D_' + count] = d_NonLife.groupby(['year'])[count].diff().fillna(d_NonLife[count])
         #moving average 12 bulan
         ma_12=d_NonLife[count].rolling(window=12)
         d_NonLife['Roll_' + count] =ma_12.mean()
+        #percent change
+        d_NonLife['Growth_'+count]=d_NonLife[count].pct_change(periods=12)*100
          
+    #join life and non life
+    df_join = pd.concat([d_Life, d_NonLife],axis=0)    
     
-    d_Life['ROE'] = d_Life['Income (Loss) Before Tax']/d_Life['Total Equities']    
-    d_NonLife['ROE'] = d_NonLife['Income (Loss) Before Tax']/d_NonLife['Total Equities']
-    
+    #calculate ratio
+    df_join['ROA'] = df_join['Roll_Income (Loss) Before Tax']/df_join['Roll_Total Assets']
+    df_join['ROE'] = df_join['Roll_Income (Loss) Before Tax']/df_join['Total Equities']
+    #df_join['Growth Premium Income'] = df_join['Chg_Premium Income']
+    #df['Investment Growth'] = df['Total Investment'].pct_change(periods=12)*100
+    #df['Assets Growth'] = df['Total Assets'].pct_change(periods=12)*100
+    df_join['Investment Yield Ratio'] = df_join['Roll_Investment Yield'] /df_join['Roll_Total Investment']
+    df_join['Loss Ratio'] = df_join['Roll_Total Claims and Benefits']/df_join['Roll_Total Net Premium Income']
+    df_join['Expense Ratio'] = df_join['Roll_Total Operating Expenses']/df_join['Roll_Total Net Premium Income']
+    df_join['Combined Ratio'] = df_join['Loss Ratio'] + df_join['Expense Ratio']
+    df_join['Cession Ratio'] = df_join['Roll_Reinsurance Income'] / df_join['Roll_Premium Income']
+    df_join['Retention Ratio'] = 1 - df_join['Cession Ratio']
+    df_join['Net Income Ratio'] = df_join['Roll_Income (Loss) After Tax']/df_join['Roll_Total Net Premium Income']
+    df_join['Liquid Ratio'] = (df_join['Cash and Bank'] + df_join['Time Deposit']) / df_join['Total Payable']
+    df_join['Investment Adequacy Ratio'] = (df_join['Cash and Bank'] + df_join['Total Investment']) / df_join['Total Technical Reserve']
+    df_join['Premium to Claim Ratio'] = df_join['Roll_Total Net Premium Income']/df_join['Roll_Total Claims and Benefits']
+    df_join['Premium to Claim and G/A Ratio'] = df_join['Roll_Total Net Premium Income']/(df_join['Roll_Total Claims and Benefits'] + df_join['Roll_General And Administration Expenses'])
+
+    write_sql(df_join,'life_non_life')
     write_sql(d_Life,'life_insurance')
     write_sql(d_NonLife,'non_life_insurance')
     
